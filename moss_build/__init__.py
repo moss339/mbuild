@@ -1,0 +1,3 @@
+"""MOSS Build - Universal build tool."""
+
+__version__ = '0.1.0'
