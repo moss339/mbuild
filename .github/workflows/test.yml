@@ -1,0 +1,57 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          pip install pytest pyyaml click
+
+      - name: Run tests
+        run: |
+          pytest tests/ -v
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install lint tools
+        run: |
+          pip install flake8 black mypy pyyaml click
+
+      - name: Check black formatting
+        run: |
+          black --check moss_build/
+
+      - name: Run flake8
+        run: |
+          flake8 moss_build/ --max-line-length=120 --ignore=E501,W503
+
+      - name: Run mypy
+        run: |
+          mypy moss_build/ --ignore-missing-imports

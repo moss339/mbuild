@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install moss-build
+        run: pip install -e .
+
+      - name: Create test config
+        run: |
+          mkdir -p /tmp/test-moss
+          cat > /tmp/test-moss/moss.yaml << 'EOF'
+          name: test
+          settings:
+            build_root: ./build
+            install_root: ./dist
+            cache_dir: .moss/cache
+            parallel_jobs: 2
+            build_type: Release
+          components:
+            - name: mshm
+              repository:
+                url: https://github.com/moss339/mshm.git
+                branch: main
+              local_path: mshm
+              build:
+                type: library
+                language: C
+            - name: mdds
+              repository:
+                url: https://github.com/moss339/mdds.git
+                branch: main
+              local_path: mdds
+              dependencies:
+                - name: mshm
+                  local_path: mshm
+              build:
+                type: library
+                language: C++17
+          EOF
+
+      - name: Validate config
+        working-directory: /tmp/test-moss
+        run: moss-build validate -c moss.yaml
+
+      - name: List components
+        working-directory: /tmp/test-moss
+        run: moss-build list -c moss.yaml
+
+      - name: Show dependencies
+        working-directory: /tmp/test-moss
+        run: moss-build deps -c moss.yaml
+
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install moss-build
+        run: pip install -e .
+
+      - name: Create minimal test config
+        run: |
+          mkdir -p /tmp/build-test
+          cat > /tmp/build-test/moss.yaml << 'EOF'
+          name: build-test
+          settings:
+            build_root: ./build
+            install_root: ./dist
+            cache_dir: .moss/cache
+            parallel_jobs: 2
+            build_type: Release
+          components:
+            - name: mshm
+              repository:
+                url: https://github.com/moss339/mshm.git
+                branch: main
+              local_path: mshm
+              build:
+                type: library
+                language: C
+          EOF
+
+      - name: Sync and build
+        working-directory: /tmp/build-test
+        run: moss-build sync -c moss.yaml && moss-build build -c moss.yaml -j 2
+
+      - name: Verify build
+        run: |
+          ls -la /tmp/build-test/build/mshm/src/
+          test -f /tmp/build-test/build/mshm/src/libmshm.a && echo "Build SUCCESS"
