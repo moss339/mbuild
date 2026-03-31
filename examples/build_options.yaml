@@ -1,0 +1,33 @@
+# Global Build Options for MOSS
+# All components inherit these settings unless they override
+
+cxx_standard: C++17
+cxx_flags:
+  - -Wall
+  - -Wextra
+  - -Wno-unused-parameter
+
+defines:
+  - VERSION=1
+  - MOSS_BUILD=1
+
+build_type: Release
+parallel_jobs: 8
+
+cmake_options:
+  CMAKE_POSITION_INDEPENDENT_CODE: ON
+  CMAKE_EXPORT_COMPILE_COMMANDS: ON
+
+# Platform-specific overrides
+platform_overrides:
+  qnx:
+    cxx_flags:
+      - -Wno-pedantic
+    defines:
+      - QNX_BUILD=1
+  
+  android:
+    cxx_flags:
+      - -fPIC
+    defines:
+      - ANDROID_BUILD=1

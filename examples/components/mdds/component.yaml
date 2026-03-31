@@ -1,0 +1,30 @@
+# component.yaml - MOSS Decentralized Discovery Service
+
+name: mdds
+description: MOSS Decentralized Discovery Service (C++17)
+
+source:
+  root: .
+
+dependencies:
+  local:
+    - mshm
+  system:
+    - pthread
+
+build:
+  type: library
+
+install:
+  type: library
+  
+  artifacts:
+    headers:
+      from: include/
+      to: include/mdds/
+    
+    libraries:
+      from: lib/
+      patterns:
+        - libmdds.a
+        - libmdds.so*

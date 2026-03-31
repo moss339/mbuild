@@ -21,6 +21,11 @@ class BuildError(MossBuildError):
     pass
 
 
+class InstallError(MossBuildError):
+    """Install related errors."""
+    pass
+
+
 class DependencyCycleError(MossBuildError):
     """Circular dependency detected."""
     pass

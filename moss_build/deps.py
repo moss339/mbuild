@@ -1,6 +1,6 @@
 """Dependency resolution with topological sort."""
 
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Optional
 from .config import Component
 from .exceptions import DependencyCycleError
 
@@ -19,8 +19,8 @@ def topological_sort(components: List[Component]) -> List[Component]:
 
     # For each component, add edges from dependencies to dependents
     for comp in components:
-        for dep in comp.dependencies:
-            dep_name = dep.get('name')
+        local_deps = comp.dependencies.get('local', [])
+        for dep_name in local_deps:
             if dep_name in comp_map:
                 adj[dep_name].append(comp.name)
                 in_degree[comp.name] += 1

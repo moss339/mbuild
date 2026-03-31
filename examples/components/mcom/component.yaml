@@ -1,0 +1,46 @@
+# component.yaml - MOSS Communication Middleware
+
+name: mcom
+description: MOSS Unified Communication Middleware (Topic + Service + Action + Node)
+
+# Source location (local - relative to this file)
+source:
+  root: .
+
+# Dependencies - COMPONENT SELF-DECLARES its own deps
+dependencies:
+  local:
+    - mdds
+    - mshm
+  system:
+    - pthread
+    - protobuf
+
+# Build config - inherits global + can override
+build:
+  # inherit: ../../build_options.yaml  # Optional: inherit from parent
+  type: library
+  cmake_options:
+    ENABLE_TESTS: ON
+    MCOM_BUILD_SHM: ON
+
+# Install rules - COMPONENT SELF-DECIDES what to install
+install:
+  type: library
+  
+  artifacts:
+    # Headers -> include/mcom/
+    headers:
+      from: include/
+      to: include/mcom/
+    
+    # Libraries -> lib/
+    libraries:
+      from: lib/
+      patterns:
+        - libmcom.a
+        - libmcom.so*
+  
+  # Runtime dependency check after install
+  runtime_check:
+    - libprotobuf.so

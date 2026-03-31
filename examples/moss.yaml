@@ -1,0 +1,67 @@
+# MOSS Project Manifest
+# Top-level build declaration
+
+name: moss-full
+description: MOSS Complete System Build
+version: "1.0.0"
+
+# Global build options file
+build_options: ./build_options.yaml
+
+# Install settings
+settings:
+  install_root: ./dist
+  install_prefix: /opt/moss
+  cache_dir: .moss/cache
+  clone_depth: 1
+
+# Components list
+# Just declare name + path (or repository), dependencies are in component.yaml
+components:
+
+  # ===== MOSS Core Libraries =====
+  
+  - name: mshm
+    path: components/mshm
+
+  - name: mdds
+    path: components/mdds
+
+  - name: mcom
+    path: components/mcom
+
+  - name: mlog
+    path: components/mlog
+
+  - name: mruntime
+    path: components/mruntime
+
+  - name: msomeip
+    path: components/msomeip
+
+  - name: mrouting
+    path: components/mrouting
+
+  - name: msafety
+    path: components/msafety
+
+  - name: mparam
+    path: components/mparam
+
+  - name: mvisual
+    path: components/mvisual
+
+  - name: mlaunch
+    path: components/mlaunch
+
+  - name: config_server
+    path: components/config_server
+
+  # ===== Applications =====
+  
+  # Remote example:
+  # - name: perception
+  #   repository:
+  #     url: https://github.com/yourorg/perception.git
+  #     branch: main
+  #   path: apps/perception

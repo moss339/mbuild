@@ -1,0 +1,31 @@
+# component.yaml - MOSS Shared Memory
+
+name: mshm
+description: MOSS Shared Memory Foundation Library (C)
+
+source:
+  root: .
+
+# No local dependencies - this is a base library
+dependencies:
+  local: []
+  system:
+    - pthread
+
+build:
+  type: library
+  language: C
+
+install:
+  type: library
+  
+  artifacts:
+    headers:
+      from: include/
+      to: include/mshm/
+    
+    libraries:
+      from: lib/
+      patterns:
+        - libmshm.a
+        - libmshm.so*

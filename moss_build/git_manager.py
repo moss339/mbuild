@@ -11,8 +11,9 @@ from .exceptions import GitError
 class GitManager:
     """Manages git clone, fetch, and checkout operations."""
 
-    def __init__(self, cache_dir: str):
-        self.cache_dir = Path(cache_dir)
+    def __init__(self, cache_dir: Path):
+        self.cache_dir = cache_dir
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _run_git(self, args: list, cwd: Optional[str] = None, check: bool = True) -> str:
         """Run a git command and return output."""
@@ -35,35 +36,27 @@ class GitManager:
         except GitError:
             return ""
 
-    def is_synced(self, component: Component) -> bool:
-        """Check if component is already at target commit/branch."""
-        repo_path = self.cache_dir / component.local_path
-        if not repo_path.exists():
-            return False
-
-        current_commit = self.get_current_commit(str(repo_path))
-        target_commit = component.repository.get('commit')
-
-        if target_commit:
-            return current_commit == target_commit
-        return True  # No specific commit, assume synced if exists
-
     def sync(self, component: Component) -> str:
         """
-        Clone or update a component's repository.
+        Sync a component's repository (clone or update).
+        
+        For local components (no repository URL), returns the local path.
+        For remote components, clones/updates in cache directory.
 
         Returns the source path of the repository.
         """
-        repo_path = self.cache_dir / component.local_path
-        url = component.repository.get('url', '')
-        branch = component.repository.get('branch', 'main')
-        commit = component.repository.get('commit')
+        repo_info = component.repository
+        if not repo_info or not repo_info.get('url'):
+            # Local component - return its path directly
+            return str(component._component_dir)
 
-        if not url:
-            raise GitError(f"No repository URL for component: {component.name}")
-
-        # Ensure cache directory exists
-        repo_path.parent.mkdir(parents=True, exist_ok=True)
+        url = repo_info.get('url', '')
+        branch = repo_info.get('branch', 'main')
+        commit = repo_info.get('commit')
+        
+        # Determine cache path from URL
+        repo_name = url.rstrip('/').split('/')[-1].replace('.git', '')
+        repo_path = self.cache_dir / repo_name
 
         if not repo_path.exists():
             # Clone the repository
@@ -87,3 +80,23 @@ class GitManager:
                 self._run_git(['checkout', branch], cwd=str(repo_path))
 
         return str(repo_path)
+    
+    def is_synced(self, component: Component) -> bool:
+        """Check if component is already at target commit/branch."""
+        repo_info = component.repository
+        if not repo_info or not repo_info.get('url'):
+            # Local component - always "synced"
+            return True
+
+        repo_name = repo_info.get('url', '').rstrip('/').split('/')[-1].replace('.git', '')
+        repo_path = self.cache_dir / repo_name
+        
+        if not repo_path.exists():
+            return False
+
+        current_commit = self.get_current_commit(str(repo_path))
+        target_commit = repo_info.get('commit')
+
+        if target_commit:
+            return current_commit == target_commit
+        return True  # No specific commit, assume synced if exists
