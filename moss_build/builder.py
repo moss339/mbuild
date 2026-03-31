@@ -60,7 +60,7 @@ class Builder:
         build_opts = self.config.get_build_options(comp)
 
         # Run CMake configuration
-        cmake_args = self._build_cmake_args(src_path, build_path, build_opts)
+        cmake_args = self._build_cmake_args(src_path, build_path, build_opts, comp)
         
         if self.verbose:
             print(f"   cmake {' '.join(cmake_args)}")
@@ -72,7 +72,7 @@ class Builder:
         
         print(f"   ✅ {comp.name} built")
 
-    def _build_cmake_args(self, src: Path, build: Path, opts: BuildOptions) -> List[str]:
+    def _build_cmake_args(self, src: Path, build: Path, opts: BuildOptions, comp: Component) -> List[str]:
         """Build CMake arguments."""
         args = [
             '-S', str(src),
