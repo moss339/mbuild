@@ -20,52 +20,78 @@ jobs:
       - name: Install moss-build
         run: pip install -e .
 
-      - name: Create test config
+      - name: Clone test components
         run: |
-          mkdir -p /tmp/test-moss
-          cat > /tmp/test-moss/moss.yaml << 'EOF'
-          name: test
+          git clone --depth 1 https://github.com/moss339/mshm.git /tmp/mshm
+          git clone --depth 1 https://github.com/moss339/mdds.git /tmp/mdds
+          git clone --depth 1 https://github.com/moss339/mcom.git /tmp/mcom
+
+      - name: Create build_options.yaml
+        run: |
+          cat > /tmp/build_options.yaml << 'EOF'
+          cxx_standard: C++17
+          cxx_flags: [-Wall, -Wextra]
+          build_type: Release
+          parallel_jobs: 2
+          cmake_options:
+            CMAKE_POSITION_INDEPENDENT_CODE: ON
+          EOF
+
+      - name: Create component.yaml for mshm
+        run: |
+          cat > /tmp/mshm/component.yaml << 'EOF'
+          name: mshm
+          description: MOSS Shared Memory
+          dependencies:
+            local: []
+          build:
+            type: library
+          install:
+            type: library
+          EOF
+
+      - name: Create component.yaml for mdds
+        run: |
+          cat > /tmp/mdds/component.yaml << 'EOF'
+          name: mdds
+          description: MOSS Decentralized Discovery
+          dependencies:
+            local: [mshm]
+          build:
+            type: library
+            cmake_options:
+              MDDS_BUILD_EXAMPLES: OFF
+              MDDS_BUILD_TESTS: OFF
+          install:
+            type: library
+          EOF
+
+      - name: Create moss.yaml
+        run: |
+          cat > /tmp/moss.yaml << 'EOF'
+          name: test-moss
+          build_options: /tmp/build_options.yaml
           settings:
             build_root: ./build
             install_root: ./dist
             cache_dir: .moss/cache
-            parallel_jobs: 2
-            build_type: Release
           components:
             - name: mshm
-              repository:
-                url: https://github.com/moss339/mshm.git
-                branch: main
-              local_path: mshm
-              build:
-                type: library
-                language: C
+              path: /tmp/mshm
             - name: mdds
-              repository:
-                url: https://github.com/moss339/mdds.git
-                branch: main
-              local_path: mdds
-              dependencies:
-                - name: mshm
-                  local_path: mshm
-              build:
-                type: library
-                language: C++17
+              path: /tmp/mdds
           EOF
 
-      - name: Validate config
-        working-directory: /tmp/test-moss
-        run: moss-build validate -c moss.yaml
+      - name: Validate
+        run: moss-build validate -c /tmp/moss.yaml
 
-      - name: List components
-        working-directory: /tmp/test-moss
-        run: moss-build list -c moss.yaml
+      - name: List
+        run: moss-build list -c /tmp/moss.yaml
 
-      - name: Show dependencies
-        working-directory: /tmp/test-moss
-        run: moss-build deps -c moss.yaml
+      - name: Deps
+        run: moss-build deps -c /tmp/moss.yaml
 
-  build-test:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -78,33 +104,81 @@ jobs:
       - name: Install moss-build
         run: pip install -e .
 
-      - name: Create minimal test config
+      - name: Clone test components
         run: |
-          mkdir -p /tmp/build-test
-          cat > /tmp/build-test/moss.yaml << 'EOF'
-          name: build-test
-          settings:
-            build_root: ./build
-            install_root: ./dist
-            cache_dir: .moss/cache
-            parallel_jobs: 2
-            build_type: Release
-          components:
-            - name: mshm
-              repository:
-                url: https://github.com/moss339/mshm.git
-                branch: main
-              local_path: mshm
-              build:
-                type: library
-                language: C
+          git clone --depth 1 https://github.com/moss339/mshm.git /tmp/mshm
+          git clone --depth 1 https://github.com/moss339/mdds.git /tmp/mdds
+          git clone --depth 1 https://github.com/moss339/mcom.git /tmp/mcom
+
+      - name: Create build_options.yaml
+        run: |
+          cat > /tmp/build_options.yaml << 'EOF'
+          cxx_standard: C++17
+          build_type: Release
+          parallel_jobs: 2
+          cmake_options:
+            CMAKE_POSITION_INDEPENDENT_CODE: ON
           EOF
 
-      - name: Sync and build
-        working-directory: /tmp/build-test
-        run: moss-build sync -c moss.yaml && moss-build build -c moss.yaml -j 2
-
-      - name: Verify build
+      - name: Create component.yaml for mshm
         run: |
-          ls -la /tmp/build-test/build/mshm/src/
-          test -f /tmp/build-test/build/mshm/src/libmshm.a && echo "Build SUCCESS"
+          cat > /tmp/mshm/component.yaml << 'EOF'
+          name: mshm
+          description: MOSS Shared Memory
+          dependencies:
+            local: []
+          build:
+            type: library
+          install:
+            type: library
+          EOF
+
+      - name: Create component.yaml for mdds
+        run: |
+          cat > /tmp/mdds/component.yaml << 'EOF'
+          name: mdds
+          description: MOSS Decentralized Discovery
+          dependencies:
+            local: [mshm]
+          build:
+            type: library
+            cmake_options:
+              MDDS_BUILD_EXAMPLES: OFF
+              MDDS_BUILD_TESTS: OFF
+          install:
+            type: library
+          EOF
+
+      - name: Create moss.yaml
+        run: |
+          cat > /tmp/moss.yaml << 'EOF'
+          name: test-moss
+          build_options: /tmp/build_options.yaml
+          settings:
+            build_root: /tmp/test-build/build
+            install_root: /tmp/test-build/dist
+            cache_dir: /tmp/test-build/.moss/cache
+          components:
+            - name: mshm
+              path: /tmp/mshm
+            - name: mdds
+              path: /tmp/mdds
+          EOF
+
+      - name: Build
+        run: moss-build build -c /tmp/moss.yaml -j 2
+
+      - name: Verify
+        run: |
+          ls -la /tmp/test-build/build/mshm/src/ || ls -la /tmp/test-build/build/mshm/
+          test -f /tmp/test-build/build/mshm/src/libmshm.a || test -f /tmp/test-build/build/mshm/libmshm.a
+          echo "Build verification passed"
+
+      - name: Install
+        run: moss-build install -c /tmp/moss.yaml
+
+      - name: Verify install
+        run: |
+          ls /tmp/test-build/dist/
+          test -f /tmp/test-build/dist/deploy_manifest.yaml
+          echo "Install verification passed"
