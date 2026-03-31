@@ -86,10 +86,28 @@ class Installer:
                 for line in result.stdout.strip().split('\n'):
                     print(f"   {line}")
                     
+            # Collect installed files for manifest
+            self._collect_installed_files(comp, comp_install_dir)
+                    
         except subprocess.CalledProcessError as e:
             raise InstallError(str(e))
         
         print(f"   ✅ {comp.name}")
+    
+    def _collect_installed_files(self, comp: Component, comp_install_dir: Path):
+        """Collect all installed file paths for this component."""
+        installed_files = []
+        
+        if not comp_install_dir.exists():
+            return
+        
+        for item in comp_install_dir.rglob('*'):
+            if item.is_file():
+                # Get path relative to install root
+                rel_path = item.relative_to(comp_install_dir)
+                installed_files.append(str(rel_path))
+        
+        comp._installed_files = sorted(installed_files)
 
     def generate_manifest(self):
         """Generate deploy_manifest.yaml."""
@@ -100,12 +118,14 @@ class Installer:
             data = {
                 'name': comp.name,
                 'description': comp.description,
-                'type': comp.install.get('type', 'library') if comp.install else 'library',
-                'dependencies': {
-                    'local': comp.dependencies.get('local', []),
-                    'system': comp.dependencies.get('system', []),
-                },
+                'type': comp.build.get('type', 'library') if comp.build else 'library',
+                'dependencies': comp.dependencies.get('local', []),  # Only local deps for graph
             }
+            
+            # Add installed files
+            installed_files = getattr(comp, '_installed_files', [])
+            if installed_files:
+                data['installed_files'] = installed_files
             
             if comp.repository and comp.repository.get('url'):
                 data['repository'] = comp.repository

@@ -111,15 +111,8 @@ def list(config: str):
         for i, comp in enumerate(order, 1):
             status = "✅" if comp.enabled else "❌"
             local_deps = comp.dependencies.get('local', [])
-            system_deps = comp.dependencies.get('system', [])
             
-            deps_str = ""
-            if local_deps:
-                deps_str += f"  Local deps: {', '.join(local_deps)}"
-            if system_deps:
-                deps_str += f"  System: {', '.join(system_deps)}"
-            if not deps_str:
-                deps_str = "  (no dependencies)"
+            deps_str = f"  deps: {', '.join(local_deps)}" if local_deps else "  (no dependencies)"
             
             click.echo(f"{i}. [{status}] {comp.name}")
             click.echo(f"   {comp.description or 'No description'}")

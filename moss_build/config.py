@@ -96,8 +96,8 @@ class Component:
     
     # Dependencies (declared in component.yaml)
     dependencies: Dict[str, List[str]] = field(default_factory=dict)
-    #   local: ["mdds", "mshm"]
-    #   system: ["pthread", "protobuf"]
+    #   local: ["mdds", "mshm"]  - for dependency graph
+    #   Note: system dependencies (pthread, protobuf, etc.) are not tracked
     
     # Build config (component can inherit from global + override)
     build: Dict[str, Any] = field(default_factory=dict)
