@@ -1,131 +1,95 @@
-"""Component installer for MOSS Build - New Design.
+"""Component installer for MOSS Build - Simplified Design.
 
-Install rules are component self-deciding via component.yaml.
-Follows convention-over-configuration for library/application types.
+Leverages CMake's native install() rules instead of YAML configuration.
+Each component's CMakeLists.txt defines what to install.
 """
 
+import subprocess
 import shutil
 import yaml
-import stat
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 
 from .config import Config, Component
-from .git_manager import GitManager
 from .exceptions import InstallError
 
 
 class Installer:
-    """Installs built components based on their component.yaml install rules."""
+    """Installs built components using CMake's native install mechanism."""
 
     def __init__(self, config: Config, verbose: bool = False):
         self.config = config
         self.verbose = verbose
-        self.git_manager = GitManager(config.get_cache_dir())
         self.build_root = config.get_build_root()
         self.install_root = config.get_install_root()
         
-        # Create standard directories
-        self.lib_dir = self.install_root / 'lib'
-        self.include_dir = self.install_root / 'include'
-        self.bin_dir = self.install_root / 'bin'
-        self.etc_dir = self.install_root / 'etc'
-        
-        for d in [self.lib_dir, self.include_dir, self.bin_dir, self.etc_dir]:
-            d.mkdir(parents=True, exist_ok=True)
+        # Clean install root
+        if self.install_root.exists():
+            shutil.rmtree(self.install_root)
+        self.install_root.mkdir(parents=True)
 
     def install_all(self):
-        """Install all enabled components."""
-        for comp in self.config.get_enabled_components():
+        """Install all enabled components in build order."""
+        failed = []
+        
+        for comp in self.config.get_build_order():
+            if not comp.enabled:
+                continue
             try:
                 self.install_component(comp)
             except InstallError as e:
-                print(f"⚠️  {comp.name}: install warning: {e}", file=__import__('sys').stderr)
+                print(f"⚠️  {comp.name}: {e}", file=__import__('sys').stderr)
+                failed.append(comp.name)
+        
+        if failed:
+            print(f"\n⚠️  Install warnings for: {', '.join(failed)}")
         
         self.generate_manifest()
-        print(f"✅ Installed to {self.install_root}")
+        print(f"\n✅ Installed to {self.install_root}")
 
     def install_component(self, comp: Component):
-        """Install a single component's artifacts based on its install rules."""
+        """Install a single component using cmake --install."""
         build_path = self.build_root / comp.name
+        
         if not build_path.exists():
-            print(f"   ⚠️  {comp.name}: build directory not found, skipping install")
-            return
+            raise InstallError(f"build directory not found: {build_path}")
         
-        install_rule = comp.install
-        install_type = install_rule.get('type', 'library') if install_rule else 'library'
+        # Check if component has any installable targets
+        cmake_cache = build_path / 'CMakeCache.txt'
+        if not cmake_cache.exists():
+            raise InstallError(f"not a cmake build directory: {build_path}")
         
-        if install_type == 'library':
-            self._install_library(comp, build_path, install_rule)
-        elif install_type == 'application':
-            self._install_application(comp, build_path, install_rule)
-        else:
-            # Fallback: try library pattern
-            self._install_library(comp, build_path, install_rule)
-        
-        print(f"   📦 {comp.name} installed")
-
-    def _install_library(self, comp: Component, build_path: Path, rule: Dict[str, Any]):
-        """Install a library type component."""
-        # Headers
-        headers = rule.get('headers', {})
-        if headers:
-            src_dir = build_path / headers.get('from', 'include')
-            dest_dir = self.include_dir / headers.get('to', f'include/{comp.name}')
-            if src_dir.exists():
-                self._copy_tree(src_dir, dest_dir)
-        
-        # Libraries
-        libs = rule.get('libraries', {})
-        if libs:
-            src_dir = build_path / libs.get('from', 'lib')
-            patterns = libs.get('patterns', [f'lib{comp.name}.*'])
-            
-            for pattern in patterns:
-                for lib_file in src_dir.glob(pattern):
-                    dest = self.lib_dir / lib_file.name
-                    self._copy_file(lib_file, dest)
-                    # Set permissions
-                    dest.chmod(0o644)
-
-    def _install_application(self, comp: Component, build_path: Path, rule: Dict[str, Any]):
-        """Install an application type component."""
-        # Executables
-        executables = rule.get('executables', [])
-        if isinstance(executables, dict):
-            executables = [executables]
-        
-        for exec_rule in executables:
-            src_file = build_path / exec_rule.get('from', f'{comp.name}')
-            dest_file = self.bin_dir / exec_rule.get('to', comp.name)
-            
-            if src_file.exists():
-                self._copy_file(src_file, dest_file)
-                dest_file.chmod(exec_rule.get('mode', 0o755))
-        
-        # Configs
-        configs = rule.get('configs', {})
-        if configs:
-            src_dir = build_path / configs.get('from', 'config')
-            dest_dir = self.etc_dir / configs.get('to', comp.name)
-            if src_dir.exists():
-                self._copy_tree(src_dir, dest_dir)
-
-    def _copy_file(self, src: Path, dest: Path):
-        """Copy a single file."""
-        dest.parent.mkdir(parents=True, exist_ok=True)
         if self.verbose:
-            print(f"   cp {src} -> {dest}")
-        shutil.copy2(src, dest)
-
-    def _copy_tree(self, src: Path, dest: Path):
-        """Copy a directory tree."""
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        if self.verbose:
-            print(f"   cp -r {src} -> {dest}")
-        if dest.exists():
-            shutil.rmtree(dest)
-        shutil.copytree(src, dest)
+            print(f"   Installing {comp.name}...")
+        
+        # Run cmake --install with a component-specific prefix
+        # This allows each component to install to its own subtree
+        comp_install_dir = self.install_root / comp.name
+        
+        try:
+            result = subprocess.run(
+                ['cmake', '--install', str(build_path), '--prefix', str(comp_install_dir)],
+                capture_output=True,
+                text=True,
+            )
+            
+            if result.returncode != 0:
+                # Some components might not have install targets - that's ok
+                if 'no install target' in result.stderr.lower() or \
+                   'nothing to be done' in result.stderr.lower():
+                    if self.verbose:
+                        print(f"   {comp.name}: no install targets")
+                    return
+                raise InstallError(result.stderr.strip())
+            
+            if self.verbose and result.stdout:
+                for line in result.stdout.strip().split('\n'):
+                    print(f"   {line}")
+                    
+        except subprocess.CalledProcessError as e:
+            raise InstallError(str(e))
+        
+        print(f"   ✅ {comp.name}")
 
     def generate_manifest(self):
         """Generate deploy_manifest.yaml."""
@@ -143,7 +107,6 @@ class Installer:
                 },
             }
             
-            # Add repository info if remote
             if comp.repository and comp.repository.get('url'):
                 data['repository'] = comp.repository
             
@@ -161,3 +124,50 @@ class Installer:
         
         if self.verbose:
             print(f"   Generated {manifest_path}")
+
+
+def install_to_flat_prefix(config: Config, prefix: Path, verbose: bool = False) -> Path:
+    """
+    Alternative installer that collects all components into a flat prefix.
+    
+    Instead of each component having its own subdirectory:
+        dist/mshm/...
+        dist/mcom/...
+    
+    It installs everything flat:
+        dist/lib/...
+        dist/include/...
+        dist/bin/...
+    
+    This is useful for creating a deployable package.
+    """
+    # Build a unified install prefix
+    unified_prefix = prefix / 'unified'
+    
+    if unified_prefix.exists():
+        shutil.rmtree(unified_prefix)
+    unified_prefix.mkdir(parents=True)
+    
+    for comp in config.get_build_order():
+        if not comp.enabled:
+            continue
+        
+        build_path = config.get_build_root() / comp.name
+        if not build_path.exists():
+            continue
+        
+        try:
+            subprocess.run(
+                ['cmake', '--install', str(build_path), '--prefix', str(unified_prefix)],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            if verbose:
+                print(f"   ✅ {comp.name}")
+        except subprocess.CalledProcessError as e:
+            if verbose:
+                print(f"   ⚠️  {comp.name}: {e.stderr.strip()}")
+            continue
+    
+    return unified_prefix
