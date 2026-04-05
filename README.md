@@ -1,4 +1,4 @@
-# moss-build
+# mbuild
 
 MOSS 通用构建系统 - Python CLI 工具
 
@@ -29,7 +29,7 @@ MOSS 通用构建系统 - Python CLI 工具
 ```bash
 pip install -e .
 # 或
-pip install moss-build
+pip install mbuild
 ```
 
 ## 快速开始
@@ -38,13 +38,13 @@ pip install moss-build
 cd /path/to/moss/project
 
 # 验证配置
-moss-build validate -c moss.yaml
+mbuild validate -c moss.yaml
 
 # 构建全部（并行）
-moss-build build -c moss.yaml -j 8
+mbuild build -c moss.yaml -j 8
 
 # 安装（使用 CMake 原生 install 规则）
-moss-build install -c moss.yaml
+mbuild install -c moss.yaml
 
 # 查看结果
 ls dist/
@@ -125,7 +125,7 @@ components:
 ## 构建流程
 
 ```
-moss-build build -c moss.yaml
+mbuild build -c moss.yaml
 │
 ├── 1. 解析配置
 │   ├── 读取 moss.yaml

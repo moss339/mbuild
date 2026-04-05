@@ -1,9 +1,9 @@
-"""Setup script for moss-build."""
+"""Setup script for mbuild."""
 
 from setuptools import setup, find_packages
 
 setup(
-    name='moss-build',
+    name='mbuild',
     version='0.1.0',
     packages=find_packages(),
     install_requires=[
@@ -12,7 +12,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'moss-build=moss_build.cli:cli',
+            'mbuild=mbuild.cli:cli',
         ],
     },
     python_requires='>=3.8',

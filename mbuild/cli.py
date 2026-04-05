@@ -1,4 +1,4 @@
-"""MOSS Build CLI - Command line interface - New Design."""
+"""MBuild CLI - Command line interface."""
 
 import click
 import sys
@@ -9,7 +9,7 @@ from .git_manager import GitManager
 from .builder import Builder
 from .installer import Installer
 from .deps import topological_sort
-from .exceptions import MossBuildError, ConfigError, ComponentNotFoundError
+from .exceptions import MBuildError, ConfigError, ComponentNotFoundError
 
 
 DEFAULT_CONFIG = 'moss.yaml'
@@ -18,7 +18,7 @@ DEFAULT_CONFIG = 'moss.yaml'
 @click.group()
 @click.version_option(version='0.2.0')
 def cli():
-    """MOSS Build System - Universal build tool with component self-description."""
+    """MBuild - Universal build tool with component self-description."""
     pass
 
 
@@ -49,7 +49,7 @@ def build(config: str, jobs: int, verbose: bool):
         builder = Builder(cfg, jobs=jobs, verbose=verbose)
         builder.build_all()
 
-    except MossBuildError as e:
+    except MBuildError as e:
         click.echo(f"❌ Error: {e}", err=True)
         sys.exit(1)
 
@@ -72,7 +72,7 @@ def sync(config: str):
         
         click.echo("\n✅ Sync complete!")
 
-    except MossBuildError as e:
+    except MBuildError as e:
         click.echo(f"❌ Error: {e}", err=True)
         sys.exit(1)
 
@@ -92,7 +92,7 @@ def install(config: str, verbose: bool):
         installer = Installer(cfg, verbose=verbose)
         installer.install_all()
 
-    except MossBuildError as e:
+    except MBuildError as e:
         click.echo(f"❌ Error: {e}", err=True)
         sys.exit(1)
 
@@ -119,7 +119,7 @@ def list(config: str):
             click.echo(f"   {deps_str}")
             click.echo("")
 
-    except MossBuildError as e:
+    except MBuildError as e:
         click.echo(f"❌ Error: {e}", err=True)
         sys.exit(1)
 
@@ -145,7 +145,7 @@ def deps(config: str, verbose: bool):
                 click.echo(f"   -> {deps_str}")
             click.echo("")
 
-    except MossBuildError as e:
+    except MBuildError as e:
         click.echo(f"❌ Error: {e}", err=True)
         sys.exit(1)
 
@@ -188,7 +188,7 @@ def validate(config: str):
         
         click.echo("\n✅ Validation passed!")
 
-    except MossBuildError as e:
+    except MBuildError as e:
         click.echo(f"❌ Validation failed: {e}", err=True)
         sys.exit(1)
 
@@ -225,7 +225,7 @@ def clean(config: str, verbose: bool):
         else:
             click.echo("No install directory to clean")
 
-    except MossBuildError as e:
+    except MBuildError as e:
         click.echo(f"❌ Error: {e}", err=True)
         sys.exit(1)
 
@@ -264,7 +264,7 @@ def tree(config: str):
             click.echo(f"   build: {opts.build_type}, {opts.cxx_standard}")
             click.echo("")
 
-    except MossBuildError as e:
+    except MBuildError as e:
         click.echo(f"❌ Error: {e}", err=True)
         sys.exit(1)
 

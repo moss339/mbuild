@@ -46,12 +46,12 @@ jobs:
 
       - name: Check black formatting
         run: |
-          black --check moss_build/
+          black --check mbuild/
 
       - name: Run flake8
         run: |
-          flake8 moss_build/ --max-line-length=120 --ignore=E501,W503
+          flake8 mbuild/ --max-line-length=120 --ignore=E501,W503
 
       - name: Run mypy
         run: |
-          mypy moss_build/ --ignore-missing-imports
+          mypy mbuild/ --ignore-missing-imports
