@@ -45,10 +45,10 @@ class Builder:
             return
 
         print(f"📦 Building {comp.name}...")
-        
+
         # Get source (sync if remote)
         src_path = Path(self.git_manager.sync(comp))
-        
+
         if not src_path.exists():
             raise BuildError(f"Source path not found: {src_path}")
 
@@ -61,16 +61,33 @@ class Builder:
 
         # Run CMake configuration
         cmake_args = self._build_cmake_args(src_path, build_path, build_opts, comp)
-        
+
         if self.verbose:
             print(f"   cmake {' '.join(cmake_args)}")
-        
+
         self._run_cmake(cmake_args)
-        
+
         # Run build
         self._run_build(str(build_path))
-        
+
+        # Fixup: Copy Targets.cmake to cmake/ dir for find_package from build tree
+        self._fixup_cmake_config(build_path, comp.name)
+
         print(f"   ✅ {comp.name} built")
+
+    def _fixup_cmake_config(self, build_path: Path, comp_name: str):
+        """Fix CMake config files for find_package from build tree.
+
+        CMake generates *Targets.cmake in build root, but *Config.cmake
+        expects it in the same cmake/ subdirectory. This copies it there.
+        """
+        targets_file = build_path / f'{comp_name}Targets.cmake'
+        cmake_dir = build_path / 'cmake'
+
+        if targets_file.exists() and cmake_dir.exists():
+            import shutil
+            dest = cmake_dir / f'{comp_name}Targets.cmake'
+            shutil.copy2(targets_file, dest)
 
     def _build_cmake_args(self, src: Path, build: Path, opts: BuildOptions, comp: Component) -> List[str]:
         """Build CMake arguments."""
@@ -78,24 +95,31 @@ class Builder:
             '-S', str(src),
             '-B', str(build),
         ]
-        
+
         # Add build options
         args.extend(opts.to_cmake_args())
-        
-        # Add RPATH for local dependencies
-        local_deps = []
-        comp_deps = getattr(comp, 'dependencies', {})
-        for dep_name in comp_deps.get('local', []):
-            if dep_name in self.config._components_map:
-                dep_comp = self.config._components_map[dep_name]
-                lib_dir = self.build_root / dep_name / 'lib'
+
+        # Build CMAKE_PREFIX_PATH from ALL already-built components
+        # This handles transitive dependencies (e.g., mdds -> mshm)
+        prefix_paths = []
+        rpath_dirs = []
+
+        for built_comp in self.build_root.iterdir():
+            if built_comp.is_dir() and built_comp.name != comp.name:
+                cmake_dir = built_comp / 'cmake'
+                if cmake_dir.exists():
+                    prefix_paths.append(str(built_comp))
+                lib_dir = built_comp / 'lib'
                 if lib_dir.exists():
-                    local_deps.append(str(lib_dir))
-        
-        if local_deps:
-            rpath = ':'.join(local_deps)
+                    rpath_dirs.append(str(lib_dir))
+
+        if prefix_paths:
+            args.append(f'-DCMAKE_PREFIX_PATH={";".join(prefix_paths)}')
+
+        if rpath_dirs:
+            rpath = ':'.join(rpath_dirs)
             args.append(f'-DCMAKE_INSTALL_RPATH={rpath}')
-        
+
         return args
 
     def _run_cmake(self, args: list):
