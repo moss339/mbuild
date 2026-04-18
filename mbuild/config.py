@@ -367,7 +367,11 @@ class Config:
         if self.manifest._manifest_dir:
             return self.manifest._manifest_dir / self.manifest.cache_dir
         return Path(self.manifest.cache_dir)
-    
+
+    def get_manifest_dir(self) -> Path:
+        """Get manifest directory (where moss.yaml is located)."""
+        return self.manifest._manifest_dir or Path('.')
+
     def get_build_root(self) -> Path:
         """Get absolute build directory path."""
         if self.manifest._manifest_dir:

@@ -120,11 +120,27 @@ class Deployer:
             shutil.copy2(cmake_file, cmake_dest_dir / cmake_file.name)
             deployed_files.append(f'cmake/{comp.name}/{cmake_file.name}')
 
+        # Also check cmake/ subdirectory
+        cmake_subdir = build_path / 'cmake'
+        if cmake_subdir.exists():
+            for cmake_file in cmake_subdir.glob('*Config.cmake'):
+                cmake_dest_dir = prefix / 'cmake' / comp.name
+                cmake_dest_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(cmake_file, cmake_dest_dir / cmake_file.name)
+                deployed_files.append(f'cmake/{comp.name}/{cmake_file.name}')
+
         for cmake_file in cmake_src.glob('*Targets.cmake'):
             cmake_dest_dir = prefix / 'cmake' / comp.name
             cmake_dest_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(cmake_file, cmake_dest_dir / cmake_file.name)
             deployed_files.append(f'cmake/{comp.name}/{cmake_file.name}')
+
+        if cmake_subdir.exists():
+            for cmake_file in cmake_subdir.glob('*Targets.cmake'):
+                cmake_dest_dir = prefix / 'cmake' / comp.name
+                cmake_dest_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(cmake_file, cmake_dest_dir / cmake_file.name)
+                deployed_files.append(f'cmake/{comp.name}/{cmake_file.name}')
 
         # Deploy executables
         for exe in build_path.glob('**/mcom*'):

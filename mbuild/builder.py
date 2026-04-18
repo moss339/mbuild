@@ -113,6 +113,11 @@ class Builder:
                 if lib_dir.exists():
                     rpath_dirs.append(str(lib_dir))
 
+        # Add proto/build for protobuf definitions
+        proto_build = self.config.get_manifest_dir() / 'proto' / 'build'
+        if proto_build.exists():
+            prefix_paths.append(str(proto_build))
+
         if prefix_paths:
             args.append(f'-DCMAKE_PREFIX_PATH={";".join(prefix_paths)}')
 
