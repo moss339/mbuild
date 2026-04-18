@@ -14,9 +14,6 @@ from .deps import topological_sort
 from .exceptions import MBuildError, ConfigError, ComponentNotFoundError
 
 
-DEFAULT_CONFIG = 'moss.yaml'
-
-
 @click.group()
 @click.version_option(version='0.2.0')
 def cli():
@@ -25,13 +22,16 @@ def cli():
 
 
 @cli.command()
-@click.option('-c', '--config', default=DEFAULT_CONFIG, help='Configuration file (moss.yaml)')
+@click.argument('config')  # 必填参数
 @click.option('-j', '--jobs', default=4, help='Number of parallel jobs')
 @click.option('-v', '--verbose', is_flag=True, help='Verbose output')
 def build(config: str, jobs: int, verbose: bool):
-    """Build all components in dependency order."""
+    """Build all components in dependency order.
+
+    CONFIG: Path to moss.yaml configuration file.
+    """
     try:
-        cfg = Config.from_yaml(config)
+        cfg = Config.from_yaml(config, find_root=False)
         
         if verbose:
             click.echo(f"Build root: {cfg.get_build_root()}")
@@ -57,11 +57,14 @@ def build(config: str, jobs: int, verbose: bool):
 
 
 @cli.command()
-@click.option('-c', '--config', default=DEFAULT_CONFIG, help='Configuration file')
+@click.argument('config')
 def sync(config: str):
-    """Sync (clone/update) all remote component sources."""
+    """Sync (clone/update) all remote component sources.
+
+    CONFIG: Path to moss.yaml configuration file.
+    """
     try:
-        cfg = Config.from_yaml(config)
+        cfg = Config.from_yaml(config, find_root=False)
         git_manager = GitManager(cfg.get_cache_dir())
 
         for comp in cfg.get_enabled_components():
@@ -80,12 +83,15 @@ def sync(config: str):
 
 
 @cli.command()
-@click.option('-c', '--config', default=DEFAULT_CONFIG, help='Configuration file')
+@click.argument('config')
 @click.option('-v', '--verbose', is_flag=True, help='Verbose output')
 def install(config: str, verbose: bool):
-    """Install all components based on their install rules."""
+    """Install all components based on their install rules.
+
+    CONFIG: Path to moss.yaml configuration file.
+    """
     try:
-        cfg = Config.from_yaml(config)
+        cfg = Config.from_yaml(config, find_root=False)
         
         if verbose:
             click.echo(f"Install root: {cfg.get_install_root()}")
@@ -100,11 +106,14 @@ def install(config: str, verbose: bool):
 
 
 @cli.command()
-@click.option('-c', '--config', default=DEFAULT_CONFIG, help='Configuration file')
+@click.argument('config')
 def list(config: str):
-    """List all components with their dependencies."""
+    """List all components with their dependencies.
+
+    CONFIG: Path to moss.yaml configuration file.
+    """
     try:
-        cfg = Config.from_yaml(config)
+        cfg = Config.from_yaml(config, find_root=False)
         order = cfg.get_build_order()
 
         click.echo(f"Project: {cfg.manifest.name}")
@@ -127,12 +136,15 @@ def list(config: str):
 
 
 @cli.command()
-@click.option('-c', '--config', default=DEFAULT_CONFIG, help='Configuration file')
+@click.argument('config')
 @click.option('-v', '--verbose', is_flag=True, help='Show dependency details')
 def deps(config: str, verbose: bool):
-    """Show component dependencies (topological order)."""
+    """Show component dependencies (topological order).
+
+    CONFIG: Path to moss.yaml configuration file.
+    """
     try:
-        cfg = Config.from_yaml(config)
+        cfg = Config.from_yaml(config, find_root=False)
         order = cfg.get_build_order()
 
         click.echo("Dependency build order:\n")
@@ -153,11 +165,14 @@ def deps(config: str, verbose: bool):
 
 
 @cli.command()
-@click.option('-c', '--config', default=DEFAULT_CONFIG, help='Configuration file')
+@click.argument('config')
 def validate(config: str):
-    """Validate the moss.yaml and component.yaml files."""
+    """Validate the moss.yaml and component.yaml files.
+
+    CONFIG: Path to moss.yaml configuration file.
+    """
     try:
-        cfg = Config.from_yaml(config)
+        cfg = Config.from_yaml(config, find_root=False)
         
         click.echo(f"✅ Configuration valid: {config}")
         click.echo(f"   Project: {cfg.manifest.name}")
@@ -196,12 +211,15 @@ def validate(config: str):
 
 
 @cli.command()
-@click.option('-c', '--config', default=DEFAULT_CONFIG, help='Configuration file')
+@click.argument('config')
 @click.option('-v', '--verbose', is_flag=True, help='Show what would be cleaned')
 def clean(config: str, verbose: bool):
-    """Clean build and install directories."""
+    """Clean build and install directories.
+
+    CONFIG: Path to moss.yaml configuration file.
+    """
     try:
-        cfg = Config.from_yaml(config)
+        cfg = Config.from_yaml(config, find_root=False)
         
         import shutil
         
@@ -233,11 +251,14 @@ def clean(config: str, verbose: bool):
 
 
 @cli.command()
-@click.option('-c', '--config', default=DEFAULT_CONFIG, help='Configuration file')
+@click.argument('config')
 def tree(config: str):
-    """Show component tree (what would be built, installed)."""
+    """Show component tree (what would be built, installed).
+
+    CONFIG: Path to moss.yaml configuration file.
+    """
     try:
-        cfg = Config.from_yaml(config)
+        cfg = Config.from_yaml(config, find_root=False)
         
         click.echo(f"Project: {cfg.manifest.name}")
         click.echo(f"Install root: {cfg.get_install_root()}\n")
@@ -272,20 +293,24 @@ def tree(config: str):
 
 
 @cli.command()
-@click.argument('prefix', default='./dist')
+@click.argument('prefix')
+@click.argument('config')
 @click.option('--strip', is_flag=True, help='Strip debug symbols')
 @click.option('--generate-env/--no-generate-env', default=True, help='Generate environment setup script')
-@click.option('-c', '--config', default=DEFAULT_CONFIG, help='Configuration file')
 @click.option('-v', '--verbose', is_flag=True, help='Verbose output')
-def deploy(prefix: str, strip: bool, generate_env: bool, config: str, verbose: bool):
+def deploy(prefix: str, config: str, strip: bool, generate_env: bool, verbose: bool):
     """Deploy all components to specified directory.
 
+    PREFIX: Target deployment directory.
+
+    CONFIG: Path to moss.yaml configuration file.
+
     Examples:
-        mbuild deploy /opt/moss
-        mbuild deploy --strip --generate-env /usr/local/moss
+        mbuild deploy /opt/moss ./moss.yaml
+        mbuild deploy --strip /usr/local/moss ./moss.yaml
     """
     try:
-        cfg = Config.from_yaml(config)
+        cfg = Config.from_yaml(config, find_root=False)
 
         deployer = Deployer(cfg, verbose=verbose)
         deployer.deploy(Path(prefix), strip=strip, generate_env=generate_env)
@@ -296,22 +321,23 @@ def deploy(prefix: str, strip: bool, generate_env: bool, config: str, verbose: b
 
 
 @cli.command('cross-build')
+@click.argument('config')
 @click.option('--toolchain', help='CMake toolchain file path')
 @click.option('--target', help='Target triple (e.g., aarch64-linux-gnu)')
 @click.option('--sysroot', help='Sysroot path for target')
 @click.option('-j', '--jobs', default=8, help='Number of parallel jobs')
-@click.option('-c', '--config', default=DEFAULT_CONFIG, help='Configuration file')
 @click.option('-v', '--verbose', is_flag=True, help='Verbose output')
-def cross_build(toolchain: str, target: str, sysroot: str, jobs: int, config: str, verbose: bool):
+def cross_build(config: str, toolchain: str, target: str, sysroot: str, jobs: int, verbose: bool):
     """Cross-compile for target platform.
 
+    CONFIG: Path to moss.yaml configuration file.
+
     Examples:
-        mbuild cross-build --target aarch64-linux-gnu
-        mbuild cross-build --toolchain toolchain-armhf.cmake
-        mbuild cross-build --target aarch64-linux-gnu --sysroot /opt/sysroot-aarch64
+        mbuild cross-build ./moss.yaml --target aarch64-linux-gnu
+        mbuild cross-build ./moss.yaml --toolchain toolchain-armhf.cmake
     """
     try:
-        cfg = Config.from_yaml(config)
+        cfg = Config.from_yaml(config, find_root=False)
 
         if not target and not toolchain:
             click.echo("❌ Error: --target or --toolchain is required", err=True)
@@ -333,10 +359,14 @@ def cross_build(toolchain: str, target: str, sysroot: str, jobs: int, config: st
 
 
 @cli.command('cross-targets')
-def cross_targets():
-    """List supported cross-compilation targets."""
+@click.argument('config')
+def cross_targets(config: str):
+    """List supported cross-compilation targets.
+
+    CONFIG: Path to moss.yaml configuration file.
+    """
     try:
-        cfg = Config.from_yaml(DEFAULT_CONFIG)
+        cfg = Config.from_yaml(config, find_root=False)
         cross = CrossCompiler(cfg)
         cross.list_targets()
     except MBuildError as e:
@@ -346,15 +376,19 @@ def cross_targets():
 
 @cli.command()
 @click.argument('prefix')
-@click.option('-c', '--config', default=DEFAULT_CONFIG, help='Configuration file')
+@click.argument('config')
 def undeploy(prefix: str, config: str):
     """Remove deployed files from specified directory.
 
+    PREFIX: Deployment directory to remove.
+
+    CONFIG: Path to moss.yaml configuration file.
+
     Examples:
-        mbuild undeploy /opt/moss
+        mbuild undeploy /opt/moss ./moss.yaml
     """
     try:
-        cfg = Config.from_yaml(config)
+        cfg = Config.from_yaml(config, find_root=False)
 
         deployer = Deployer(cfg)
         deployer.undeploy(Path(prefix))
@@ -365,12 +399,15 @@ def undeploy(prefix: str, config: str):
 
 
 @cli.command()
-@click.option('-c', '--config', default=DEFAULT_CONFIG, help='Configuration file')
+@click.argument('config')
 @click.option('--only', help='Only show status for specified component')
 def status(config: str, only: str):
-    """Show build status of all components."""
+    """Show build status of all components.
+
+    CONFIG: Path to moss.yaml configuration file.
+    """
     try:
-        cfg = Config.from_yaml(config)
+        cfg = Config.from_yaml(config, find_root=False)
         build_root = cfg.get_build_root()
 
         click.echo(f"Build root: {build_root}\n")
