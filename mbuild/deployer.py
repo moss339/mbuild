@@ -45,7 +45,7 @@ class Deployer:
                 files = self._deploy_component(comp, prefix, strip)
                 deployed.append({
                     'name': comp.name,
-                    'version': comp.version or '1.0.0',
+                    'version': getattr(comp, 'version', None) or '1.0.0',
                     'files': files
                 })
                 if self.verbose:
@@ -101,7 +101,7 @@ class Deployer:
                         subprocess.run(['strip', str(dest)], capture_output=True)
 
         # Deploy headers
-        src_path = Path(comp.path)
+        src_path = comp._component_dir or Path(comp.path) if hasattr(comp, 'path') else build_path
         include_src = src_path / 'include'
         if include_src.exists():
             for header_dir in include_src.iterdir():
