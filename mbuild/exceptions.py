@@ -34,3 +34,13 @@ class DependencyCycleError(MBuildError):
 class ComponentNotFoundError(MBuildError):
     """Component not found in configuration."""
     pass
+
+
+class DeployError(MBuildError):
+    """Deployment related errors."""
+    pass
+
+
+class CrossCompileError(MBuildError):
+    """Cross-compilation related errors."""
+    pass
