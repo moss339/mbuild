@@ -10,10 +10,10 @@ MOSS 通用构建系统 - Python CLI 工具
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
 │  moss.yaml              # 顶层清单（只声明组件）          │
-│     │                                                      │
+│     │                                                   │
 │     ├── build_options   # 全局编译选项（引用）            │
-│     │                                                      │
-│     └── components/*/component.yaml  # 组件自描述       │
+│     │                                                   │
+│     └── components/*/component.yaml  # 组件自描述        │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -38,35 +38,137 @@ pip install mbuild
 cd /path/to/moss/project
 
 # 验证配置
-mbuild validate -c moss.yaml
+mbuild validate
 
 # 构建全部（并行）
-mbuild build -c moss.yaml -j 8
+mbuild build -j 8
 
-# 安装（使用 CMake 原生 install 规则）
-mbuild install -c moss.yaml
+# 部署到指定目录
+mbuild deploy /opt/moss --strip --generate-env
 
-# 查看结果
-ls dist/
+# 配置环境
+source /opt/moss/share/moss/setup_env.sh
 ```
+
+## 命令详解
+
+### 构建命令
+
+| 命令 | 说明 |
+|------|------|
+| `mbuild build` | 按拓扑顺序构建所有组件 |
+| `mbuild build -j 16` | 指定并行编译数 |
+| `mbuild build -v` | 详细输出 |
+| `mbuild sync` | 同步（克隆/更新）远程组件源码 |
+| `mbuild clean` | 清理构建/安装目录 |
+| `mbuild clean --all` | 清理所有构建产物 |
+
+### 部署命令
+
+| 命令 | 说明 |
+|------|------|
+| `mbuild deploy /opt/moss` | 部署到 /opt/moss |
+| `mbuild deploy --strip /opt/moss` | 部署时 strip 调试符号 |
+| `mbuild deploy --no-generate-env /opt/moss` | 不生成环境脚本 |
+| `mbuild undeploy /opt/moss` | 移除已部署文件 |
+| `mbuild status` | 显示各组件构建状态 |
+
+### 交叉编译命令
+
+| 命令 | 说明 |
+|------|------|
+| `mbuild cross-build --target aarch64-linux-gnu` | 交叉编译到 aarch64 |
+| `mbuild cross-build --target armhf-linux-gnueabihf` | 交叉编译到 armhf |
+| `mbuild cross-build --toolchain my.cmake` | 使用自定义工具链 |
+| `mbuild cross-build --sysroot /opt/sysroot --target aarch64-linux-gnu` | 指定 sysroot |
+| `mbuild cross-targets` | 列出支持的交叉编译目标 |
+
+### 信息查询命令
+
+| 命令 | 说明 |
+|------|------|
+| `mbuild list` | 列出所有组件及依赖 |
+| `mbuild deps` | 显示依赖关系图 |
+| `mbuild deps -v` | 显示详细依赖 |
+| `mbuild tree` | 显示组件树 |
+| `mbuild validate` | 验证配置完整性 |
+| `mbuild status` | 显示构建状态 |
 
 ## 配置示例
 
-### 1. 全局编译选项 `build_options.yaml`
+### 1. 顶层清单 `moss.yaml`
 
 ```yaml
+name: moss
+version: 1.0.0
+description: MOSS Middleware System
+
+# 构建选项引用
+build_options: ./build_options.yaml
+
+# 全局设置
+settings:
+  build_root: ./build
+  install_root: ./dist
+  cache_dir: .mbuild/cache
+
+# 模块声明 (按依赖层级)
+components:
+  # Layer 0: 无依赖
+  - name: mshm
+    path: ./mshm
+    enabled: true
+
+  - name: mlog
+    path: ./mlog
+    enabled: true
+
+  # Layer 1: 依赖 Layer 0
+  - name: mdds
+    path: ./mdds
+    enabled: true
+
+  # Layer 2: 依赖 Layer 0-1
+  - name: mcom
+    path: ./mcom
+    enabled: true
+```
+
+### 2. 全局编译选项 `build_options.yaml`
+
+```yaml
+# C++ 标准
 cxx_standard: C++17
 cxx_flags:
   - -Wall
   - -Wextra
   - -Wno-unused-parameter
-defines:
-  - VERSION=1
+
+# 构建类型
 build_type: Release
+
+# 并行编译
 parallel_jobs: 8
+
+# 全局定义
+defines:
+  - MOSS_VERSION=1.0.0
+
+# 是否构建测试
+build_tests: false
+
+# 是否构建示例
+build_examples: false
+
+# 交叉编译配置 (可选)
+cross_compile:
+  enabled: false
+  toolchain: ""
+  sysroot: ""
+  target_arch: ""
 ```
 
-### 2. 组件自描述 `components/mcom/component.yaml`
+### 3. 组件自描述 `component.yaml`
 
 ```yaml
 name: mcom
@@ -76,6 +178,8 @@ dependencies:
   local:
     - mdds
     - mshm
+    - mruntime
+    - mlog
   system:
     - pthread
     - protobuf
@@ -84,43 +188,132 @@ build:
   type: library
   cmake_options:
     MCOM_BUILD_EXAMPLES: OFF
+    MCOM_BUILD_TESTS: OFF
 ```
 
 **注意**: install 规则在 CMakeLists.txt 中配置，不需要在 YAML 中重复声明。
 
-### 3. 顶层清单 `moss.yaml`
+## 部署目录结构
+
+```
+/opt/moss/
+├── lib/
+│   ├── libmshm.so
+│   ├── libmdds.so
+│   ├── libmcom.so
+│   └── ...
+├── lib64/                       # 64位库 (可选)
+├── include/
+│   ├── mshm/
+│   ├── mdds/
+│   ├── mcom/
+│   └── ...
+├── bin/
+│   ├── mcom                     # mcom CLI
+│   ├── mexem                    # mexem CLI
+│   └── ...
+├── cmake/
+│   ├── mshm/
+│   │   ├── mshmConfig.cmake
+│   │   └── mshmTargets.cmake
+│   ├── mdds/
+│   ├── mcom/
+│   └── ...
+├── share/
+│   └── moss/
+│       ├── manifest.yaml        # 部署清单
+│       └── setup_env.sh         # 环境变量脚本
+└── libexec/                     # 辅助程序
+```
+
+## 部署清单 (manifest.yaml)
+
+部署时自动生成，记录部署内容：
 
 ```yaml
-name: moss-full
-build_options: ./build_options.yaml
-
-settings:
-  install_root: ./dist
-  cache_dir: .moss/cache
+name: moss
+version: 1.0.0
+deploy_time: 2026-04-18T10:30:00Z
+deploy_path: /opt/moss
 
 components:
   - name: mshm
-    path: components/mshm
-
-  - name: mdds
-    path: components/mdds
+    version: 1.0.0
+    files:
+      - lib/libmshm.so
+      - include/mshm/
+      - cmake/mshm/
 
   - name: mcom
-    path: components/mcom
+    version: 0.1.0
+    files:
+      - lib/libmcom.so
+      - include/mcom/
+      - cmake/mcom/
+      - bin/mcom
+
+environment:
+  LD_LIBRARY_PATH: /opt/moss/lib
+  CMAKE_PREFIX_PATH: /opt/moss/cmake
+  PATH: /opt/moss/bin
 ```
 
-## 命令
+## 环境变量脚本 (setup_env.sh)
 
-| 命令 | 说明 |
-|------|------|
-| `build` | 按拓扑顺序构建所有组件 |
-| `sync` | 同步（克隆/更新）远程组件源码 |
-| `install` | 使用 CMake 原生规则安装到 dist/ |
-| `list` | 列出所有组件及依赖 |
-| `deps` | 显示依赖关系图 |
-| `tree` | 显示组件树 |
-| `validate` | 验证配置完整性 |
-| `clean` | 清理构建/安装目录 |
+部署时自动生成：
+
+```bash
+#!/bin/bash
+# MOSS Environment Setup
+# Generated by mbuild deploy
+
+export MOSS_ROOT="/opt/moss"
+export LD_LIBRARY_PATH="${MOSS_ROOT}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export CMAKE_PREFIX_PATH="${MOSS_ROOT}/cmake${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
+export PATH="${MOSS_ROOT}/bin${PATH:+:$PATH}"
+
+# For pkg-config
+export PKG_CONFIG_PATH="${MOSS_ROOT}/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+
+echo "MOSS environment configured:"
+echo "  MOSS_ROOT=${MOSS_ROOT}"
+echo "  LD_LIBRARY_PATH includes ${MOSS_ROOT}/lib"
+echo "  PATH includes ${MOSS_ROOT}/bin"
+```
+
+## 交叉编译
+
+### 支持的目标
+
+| 目标三元组 | 说明 |
+|-----------|------|
+| `aarch64-linux-gnu` | ARM64 (AArch64) |
+| `armhf-linux-gnueabihf` | ARM 32-bit hard-float |
+| `x86_64-linux-gnu` | x86-64 |
+
+### 安装交叉编译工具链
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+sudo apt-get install gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+```
+
+### 使用示例
+
+```bash
+# 检查可用目标
+mbuild cross-targets
+
+# 交叉编译到 aarch64
+mbuild cross-build --target aarch64-linux-gnu -j 8
+
+# 使用自定义 sysroot
+mbuild cross-build --target aarch64-linux-gnu --sysroot /opt/sysroot-aarch64
+
+# 使用自定义工具链文件
+mbuild cross-build --toolchain my-toolchain.cmake
+```
 
 ## 构建流程
 
@@ -146,21 +339,27 @@ mbuild build -c moss.yaml
     └── cmake --install build/<comp> --prefix dist/<comp>
 ```
 
-## 安装目录结构
+## 完整工作流示例
 
-```
-dist/
-├── mcom/              # 每个组件安装到自己的子目录
-│   ├── lib/
-│   └── include/
-├── mlog/
-│   ├── lib/
-│   └── include/
-├── mshm/
-│   ├── lib/
-│   └── include/
-├── deploy_manifest.yaml
-└── ...
+```bash
+# 1. 验证配置
+mbuild validate
+
+# 2. 编译所有模块
+mbuild build -j 16
+
+# 3. 查看构建状态
+mbuild status
+
+# 4. 部署到系统目录
+sudo mbuild deploy /opt/moss --strip --generate-env
+
+# 5. 配置环境
+source /opt/moss/share/moss/setup_env.sh
+
+# 6. 验证
+mcom list
+mexem status
 ```
 
 ## 示例项目
